@@ -19,6 +19,7 @@ logger = LogFactory.Logger("helmet").getLogger()
 import sys, glob
 
 import Helmet
+import HelmetModelPool
 
 from thrift.transport import TSocket
 from thrift.transport import TTransport
@@ -30,14 +31,6 @@ imsize=299
 chars = ["hat", "landmark", "none", "with"]
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
-model_ft = models.inception_v3(pretrained=False)
-num_ftrs = model_ft.fc.in_features
-aux_ftrs = model_ft.AuxLogits.fc.in_features
-model_ft.fc = nn.Linear(num_ftrs, len(chars))
-model_ft.AuxLogits.fc = nn.Linear(aux_ftrs, len(chars))
-model_ft = model_ft.to(device)
-model_ft.load_state_dict(torch.load("helmet/helmet_inception_v3_stat.ft", map_location=device))
-model_ft.eval()   # Set model to evaluate mode
 executor = ThreadPoolExecutor(max_workers=10)
 loader = transforms.Compose([
     transforms.Resize(int(imsize*1)),  # scale imported image
@@ -57,8 +50,8 @@ def image_loader(bufferimage):
   return image.to(device, torch.float)
 
 class HelmetHandler:
-    def __init__(self):
-      pass
+    def __init__(self, pool):
+      self.helmetPool = pool
 
     def checkHelmet(self, image):
        #result = HelmetResult(-1, False, 0) 
@@ -71,6 +64,7 @@ class HelmetHandler:
       imageData = Image.open(io.BytesIO(bufferImage))
       imageData = image_toRGB(imageData)
       data=image_loader(imageData)
+      model_ft = self.helmetPool.get()
       try:
         pred=model_ft(data)
         p= F.softmax(pred, dim=1)
@@ -86,10 +80,16 @@ class HelmetHandler:
         logger.error('exeption' + str(e))
         return -1
       finally:
+        self.helmetPool.put(model_ft)
         result = json.dumps(res)
         logger.info(result)
 
-handler = HelmetHandler()
+pool = HelmetModelPool.HelmetModelPool(3)
+obj = pool.get()
+print(obj.index_)
+obj = pool.get()
+print(obj.index_)
+handler = HelmetHandler(pool)
 processor = Helmet.Processor(handler)
 transport = TSocket.TServerSocket(port=9090)
 tfactory = TTransport.TBufferedTransportFactory()
