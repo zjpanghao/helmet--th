@@ -12,15 +12,13 @@ import base64
 from io import BytesIO
 import json
 import io
-import logging
-import LogFactory
-logger = LogFactory.Logger("helmet").getLogger()
+from LogFactory import logger
 import sys, glob
 import queue
+import threading
 
 import Helmet
 
-logger = LogFactory.Logger("helmet").getLogger()
 imsize=299
 chars = ["hat", "landmark", "none", "with"]
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -32,6 +30,7 @@ loader = transforms.Compose([
 
 def image_toRGB(image):
   if image.mode == 'RGBA':
+    logger.info("process rgba")
     r,g,b,a = image.split()
     image = Image.merge("RGB", (r, g, b))
   elif image.mode != 'RGB':
@@ -54,45 +53,52 @@ class HelmetModelPool:
   def put(self, obj):
     self.queue_.put(obj) 
 
+class HelmetResult:
+  def __init__(self):
+    self.code = -1
+    self.name = "none"
+    self.score = 0
+    self.index = 0
+
 class HelmetModel:
   index = 0
   def __init__(self):
     self.index_ = HelmetModel.index
     HelmetModel.index = HelmetModel.index + 1
-    model_ft = models.inception_v3(pretrained=False)
-    num_ftrs = model_ft.fc.in_features
-    aux_ftrs = model_ft.AuxLogits.fc.in_features
-    model_ft.fc = nn.Linear(num_ftrs, len(chars))
-    model_ft.AuxLogits.fc = nn.Linear(aux_ftrs, len(chars))
-    model_ft = model_ft.to(device)
-    model_ft.load_state_dict(torch.load("helmet/helmet_inception_v3_stat.ft", map_location=device))
-    model_ft.eval()   # Set model to evaluate mode
+    self.model_ft = models.inception_v3(pretrained=False)
+    num_ftrs = self.model_ft.fc.in_features
+    aux_ftrs = self.model_ft.AuxLogits.fc.in_features
+    print(num_ftrs, aux_ftrs)
+    self.model_ft.fc = nn.Linear(num_ftrs, 4)
+    self.model_ft.AuxLogits.fc = nn.Linear(aux_ftrs, 4)
+    #print  (image_datasets['train'].classes)
+    #print (model_ft)
+    self.model_ft = self.model_ft.to(device)
+    self.model_ft.load_state_dict(torch.load("helmet/helmet_inception_v3_stat.ft", map_location=device))
+    self.model_ft.eval()   # Set model to evaluate mode
 
   def checkHelmet(self, image):
-    logger.info("recv helmet request" + str(len(image)))
+    result = HelmetResult()
     try:
       bufferImage = base64.b64decode(image)
     except Exception as e:
-      logger.error(str(e))
-      return -1
+      logger.error("base64 error" + str(e))
+      return result
     imageData = Image.open(io.BytesIO(bufferImage))
     imageData = image_toRGB(imageData)
     data=image_loader(imageData)
     try:
-      pred=model_ft(data)
+      pred=self.model_ft(data)
       p= F.softmax(pred, dim=1)
       va,inx = torch.max(p, 1)
       index = inx.item()
       score = round(va.item(), 2)
-      if score < 0.5:
-        return -2
-      park = chars[index]
-      res = {"error_code" : 0, "results" : [{"name": park, "score": score}]}
-      return index
+      result.name = chars[index]
+      result.score = score
+      result.code = 0
+      result.index = index
+      return result
     except Exception as  e:
       logger.error('exeption' + str(e))
-      return -1
-    finally:
-      result = json.dumps(res)
-      logger.info(result)
+      return result
 

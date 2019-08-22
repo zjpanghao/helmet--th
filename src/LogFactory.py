@@ -8,5 +8,5 @@ class Logger:
     self.logger.addHandler(fh)
   def getLogger(self):
     return self.logger
-#logger = Logger("abc").getLogger()
+logger = Logger("helmet").getLogger()
 #logger.info("aaaa")

@@ -2,7 +2,7 @@
 import sys, glob
 
 import Helmet
-from ttypes import HelmetResult
+from ttypes import HelmetCheckResult
 from thrift import Thrift
 from thrift.transport import TSocket
 from thrift.transport import TTransport
