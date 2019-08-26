@@ -24,6 +24,7 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 from thrift.server import TServer
+import threading
 
 imsize=299
 chars = ["hat", "landmark", "none", "with"]
@@ -37,8 +38,10 @@ loader = transforms.Compose([
 
 class HelmetHandler:
     def __init__(self, pool):
-      print("init pool")
+      logger.info("init pool")
       self.helmetPool = pool
+    def pingHelmet(self):
+      logger.info(str(threading.current_thread().getName()) + "__" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) ) + "ping")
 
     def checkHelmet(self, image):
        #result = HelmetResult(-1, False, 0) 
@@ -48,8 +51,8 @@ class HelmetHandler:
         result = model_ft.checkHelmet(image)
         helmetResult = HelmetCheckResult(result.code, result.index, result.name, result.score)
         dure = time.time() - time_1
-        logger.info(str(result.code) + ":" 
-            + result.name + ":" + str(result.score) +"_____" + str(dure) + "s" )
+        logger.info(str(threading.current_thread().getName()) + "__" + str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) ) + "___" + str(result.code) + ":" 
+            + result.name + ":" + str(result.index) + ":" +  str(result.score) +"_____" + str(dure) + "s" )
         return helmetResult 
       except Exception as  e:
         helmetResult = HelmetCheckResult(-1)
@@ -58,7 +61,7 @@ class HelmetHandler:
       finally:
         self.helmetPool.put(model_ft)
 if __name__ == '__main__':
-  pool = HelmetModelPool.HelmetModelPool(1)
+  pool = HelmetModelPool.HelmetModelPool(10)
   handler = HelmetHandler(pool)
   processor = Helmet.Processor(handler)
   transport = TSocket.TServerSocket(port=9090)

@@ -6,4 +6,5 @@ struct HelmetCheckResult {
 }
 service Helmet {
       HelmetCheckResult checkHelmet(1:string image)
+      void pingHelmet()
 }
