@@ -27,14 +27,8 @@ from thrift.server import TServer
 import threading
 
 imsize=299
-chars = ["hat", "landmark", "none", "with"]
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
-loader = transforms.Compose([
-    transforms.Resize(int(imsize*1)),  # scale imported image
-    transforms.CenterCrop(imsize),
-    transforms.ToTensor()])  # transform it into a torch tensor
-
 
 class HelmetHandler:
     def __init__(self, pool):
@@ -61,13 +55,15 @@ class HelmetHandler:
       finally:
         self.helmetPool.put(model_ft)
 if __name__ == '__main__':
-  pool = HelmetModelPool.HelmetModelPool(10)
+  threads=5
+  pool = HelmetModelPool.HelmetModelPool(3)
   handler = HelmetHandler(pool)
   processor = Helmet.Processor(handler)
   transport = TSocket.TServerSocket(port=9090)
   tfactory = TTransport.TBufferedTransportFactory()
   pfactory = TBinaryProtocol.TBinaryProtocolFactory()
   server = TServer.TThreadPoolServer(processor, transport, tfactory, pfactory)
+  TServer.TThreadPoolServer(server).setNumThreads(3)
   print ('Starting the server...')
   server.serve()
   print ('done.')
