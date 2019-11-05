@@ -27,7 +27,8 @@ loader = transforms.Compose([
     transforms.Resize(int(imsize*1)),  # scale imported image
     transforms.CenterCrop(imsize),
 #    transforms.Grayscale(3),
-    transforms.ToTensor()])  # transform it into a torch tensor
+    transforms.ToTensor()
+ ])  # transform it into a torch tensor
 
 def image_toRGB(image):
   if image.mode == 'RGBA':
@@ -92,8 +93,8 @@ class HelmetModel:
     location = [0,0,0,0]
     maxScore = 0
     inx = -1
-    imageWidth = 230
-    step = 20
+    imageWidth = 150
+    step = 10
     while True:
       right = left + imageWidth
       down = top + imageWidth
@@ -104,13 +105,15 @@ class HelmetModel:
       box = (left, top, right, down)
       value = -1
       score = 0
-      if (right - left > 120 and down - top > 70):
+      if (right - left > 80 and down - top > 50):
         region = img.crop(box)
         value,score = self.getPredImg(region)
       if (value == 0 and score > maxScore):
         inx = 0
         maxScore = score
         location = left, top, right, down
+        if maxScore >=0.99:
+          break
       if right != size[0]:
         left += step
       elif down != size[1]:
@@ -138,7 +141,7 @@ class HelmetModel:
       confirmInx = -1
       maxScore = 0
       location = [0,0,0,0]
-      if index != 0 and va.item() > 0.89:
+      if index != 0:
         confirmInx,maxScore, location =self.getLocationScore(imageData)
       score = round(va.item(), 2)
       if (confirmInx != -1):
